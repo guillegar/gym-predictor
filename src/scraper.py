@@ -42,17 +42,47 @@ def scrape_gym_occupancy():
 
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # TODO: Inspeccionar la página y ajustar selectores
-        # Buscar elemento con aforo (puede ser span, div, etc.)
-        aforo_element = soup.find(class_="aforo")
-
-        if not aforo_element:
-            logger.warning("No se encontró elemento de aforo en la página")
+        # Encontrar la sección de aforo
+        aforo_section = soup.find('section', {'id': 'collapseAforo'})
+        if not aforo_section:
+            logger.warning("No se encontró sección collapseAforo")
             return None
 
-        occupancy = int(aforo_element.text.strip())
-        capacity = 100  # TODO: Extraer capacidad si está disponible
-        percentage = (occupancy / capacity) * 100 if capacity > 0 else 0
+        # Extraer todos los h3.cliente dentro de la sección
+        h3_elements = aforo_section.find_all('h3', class_='cliente')
+
+        if len(h3_elements) < 2:
+            logger.warning(f"Se encontraron solo {len(h3_elements)} h3 elementos")
+            for i, elem in enumerate(h3_elements):
+                logger.debug(f"h3[{i}]: {elem.get_text(strip=True)}")
+            return None
+
+        # Intenta extraer ocupación y capacidad
+        occupancy = None
+        capacity = None
+
+        for elem in h3_elements:
+            text = elem.get_text(strip=True)
+            logger.debug(f"Analizando: {text}")
+
+            # Buscar span con "Personas" (ocupación actual)
+            if 'Personas' in text:
+                occupancy = int(''.join(filter(str.isdigit, text)))
+
+            # Buscar span con "Aforo" (capacidad total)
+            if 'Aforo' in text:
+                capacity = int(''.join(filter(str.isdigit, text)))
+
+        # Si no encontramos capacidad, usamos un valor por defecto
+        if occupancy is None:
+            logger.error("No se pudo extraer ocupación")
+            return None
+
+        if capacity is None:
+            capacity = 728  # Default para Moratalaz
+            logger.info("Usando capacidad por defecto: 728")
+
+        percentage = (occupancy / capacity * 100) if capacity > 0 else 0
 
         logger.info(f"Aforo: {occupancy}/{capacity} ({percentage:.1f}%)")
         return {
