@@ -1,6 +1,8 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
 import logging
+from datetime import datetime
 from scraper import init_db, scrape_gym_occupancy, save_occupancy
 from ml_model import load_data, train_model, predict_next_hour, MODEL_PATH, SCALER_PATH
 import pickle
@@ -14,8 +16,20 @@ logger = logging.getLogger(__name__)
 
 scheduler = BackgroundScheduler()
 
+GYM_OPEN = 7      # 7:00
+GYM_CLOSE = 23    # 23:00
+
+def is_gym_open():
+    """Verifica si el gym está abierto."""
+    now = datetime.now()
+    return GYM_OPEN <= now.hour < GYM_CLOSE
+
 def scheduled_scrape():
-    """Ejecuta el scraping cada 5 minutos."""
+    """Ejecuta el scraping cada 5 minutos (solo si el gym está abierto)."""
+    if not is_gym_open():
+        logger.debug("Gym cerrado, skipping scraping")
+        return
+
     logger.info("Iniciando scraping...")
     data = scrape_gym_occupancy()
     if data:
@@ -23,7 +37,11 @@ def scheduled_scrape():
         logger.info(f"Aforo registrado: {data['occupancy']}/{data['capacity']}")
 
 def scheduled_train_and_predict():
-    """Entrena el modelo y genera predicción cada hora."""
+    """Entrena el modelo y genera predicción cada hora (solo si gym abierto)."""
+    if not is_gym_open():
+        logger.debug("Gym cerrado, skipping entrenamiento")
+        return
+
     logger.info("Entrenando modelo...")
     try:
         df = load_data()
