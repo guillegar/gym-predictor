@@ -52,24 +52,40 @@ python src/ml_model.py
 ```
 gym-predictor/
 ├── src/
-│   ├── scraper.py       # Recoge aforo del sitio
-│   ├── ml_model.py      # Entrena y predice
-│   └── scheduler.py     # Ejecuta tareas periódicamente
+│   ├── scraper.py       # Recoge aforo del sitio y escribe CSV + JSON
+│   ├── config.py        # Lista de gyms a monitorear
+│   ├── ml_model.py      # Entrena y predice (lee el CSV)
+│   └── scheduler.py     # Ejecución periódica local (opcional)
 ├── data/
-│   ├── gym_data.db      # Base de datos (se crea automáticamente)
+│   ├── history.csv      # Histórico completo (fuente de datos para ML)
+│   ├── latest.json      # Último registro (lo lee Home Assistant)
 │   ├── model.pkl        # Modelo entrenado
 │   └── scaler.pkl       # Scaler del modelo
+├── .github/workflows/
+│   └── scrape.yml       # GitHub Actions: scraping cada 5 min
+├── docs/
+│   └── HOME_ASSISTANT_SETUP.md
 ├── notebooks/           # Análisis y exploración
 └── requirements.txt
 ```
 
+## Almacenamiento de datos
+
+- **`data/history.csv`**: histórico append-only en texto (`timestamp,gym_name,occupancy,capacity,percentage`).
+  Se eligió CSV en vez de SQLite binario porque git puede fusionarlo sin conflictos, lo que
+  permite que GitHub Actions haga commit cada 5 min de forma fiable. Es la fuente de datos del ML.
+- **`data/latest.json`**: solo el último registro; lo consume Home Assistant vía REST.
+
+## Flujo automático
+
+```
+DreamFit web → GitHub Actions (cada 5 min) → scraper.py
+                                                 ├── append a history.csv
+                                                 └── sobrescribe latest.json → Home Assistant → Google Home
+```
+
 ## Próximos pasos
 
-- [ ] Inspeccionar HTML del sitio para ajustar selectores
 - [ ] Entrenar modelo con al menos 2 semanas de datos
 - [ ] Crear dashboard web para visualizar predicciones
-- [ ] Agregar más centros de DreamFit
-
-## Notas
-
-El scraper necesita validación con la estructura HTML real del sitio. Ajustaré los selectores una vez verifiquemos cómo está organizado el elemento de aforo.
+- [ ] Agregar más centros de DreamFit (editar `src/config.py`)

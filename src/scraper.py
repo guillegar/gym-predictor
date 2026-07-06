@@ -1,10 +1,11 @@
 import requests
 from bs4 import BeautifulSoup
-import sqlite3
 from datetime import datetime
 import logging
 import sys
 import json
+import csv
+import os
 from config import GYMS
 
 logging.basicConfig(
@@ -14,24 +15,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/gym_data.db"
-
-def init_db():
-    """Inicializa la base de datos si no existe."""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS gym_occupancy (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            gym_name TEXT NOT NULL,
-            occupancy INTEGER NOT NULL,
-            capacity INTEGER NOT NULL,
-            percentage REAL NOT NULL
-        )
-    """)
-    conn.commit()
-    conn.close()
+HISTORY_CSV = "data/history.csv"
+CSV_HEADER = ["timestamp", "gym_name", "occupancy", "capacity", "percentage"]
 
 def scrape_gym_occupancy(gym_url):
     """Extrae el aforo actual de una URL de DreamFit."""
@@ -94,20 +79,28 @@ def scrape_gym_occupancy(gym_url):
         return None
 
 def save_occupancy(occupancy_data, gym_name):
-    """Guarda los datos de aforo en la BD y en JSON."""
+    """Guarda los datos de aforo en el CSV historico y en el JSON de HA."""
     if not occupancy_data:
         return
 
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        INSERT INTO gym_occupancy (gym_name, occupancy, capacity, percentage)
-        VALUES (?, ?, ?, ?)
-    """, (gym_name, occupancy_data['occupancy'], occupancy_data['capacity'], occupancy_data['percentage']))
-    conn.commit()
-    conn.close()
-
+    save_history_csv(gym_name, occupancy_data)
     save_latest_json(gym_name, occupancy_data)
+
+def save_history_csv(gym_name, occupancy_data):
+    """Anade una fila al CSV historico (crea la cabecera si no existe)."""
+    file_exists = os.path.exists(HISTORY_CSV)
+    with open(HISTORY_CSV, 'a', newline='') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(CSV_HEADER)
+        writer.writerow([
+            datetime.now().isoformat(),
+            gym_name,
+            occupancy_data['occupancy'],
+            occupancy_data['capacity'],
+            round(occupancy_data['percentage'], 1),
+        ])
+    logger.info(f"Historico actualizado: {HISTORY_CSV}")
 
 def save_latest_json(gym_name, occupancy_data):
     """Guarda el ultimo registro en un archivo JSON para Home Assistant."""
@@ -125,9 +118,7 @@ def save_latest_json(gym_name, occupancy_data):
     logger.info(f"JSON actualizado: {json_path}")
 
 def scrape_all_gyms():
-    """Scrapeacomunale todos los gyms configurados."""
-    init_db()
-
+    """Scrapea todos los gyms configurados."""
     logger.info(f"Iniciando scraping de {len(GYMS)} gym(s)")
 
     for gym in GYMS:

@@ -1,4 +1,3 @@
-import sqlite3
 import pandas as pd
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
@@ -10,20 +9,15 @@ from datetime import datetime, timedelta
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-DB_PATH = "data/gym_data.db"
+HISTORY_CSV = "data/history.csv"
 MODEL_PATH = "data/model.pkl"
 SCALER_PATH = "data/scaler.pkl"
 
 def load_data():
-    """Carga datos de la BD."""
-    conn = sqlite3.connect(DB_PATH)
-    df = pd.read_sql_query(
-        "SELECT timestamp, occupancy, percentage FROM gym_occupancy ORDER BY timestamp",
-        conn
-    )
-    conn.close()
-
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    """Carga el historico desde el CSV."""
+    df = pd.read_csv(HISTORY_CSV)
+    df['timestamp'] = pd.to_datetime(df['timestamp'], format='ISO8601')
+    df = df.sort_values('timestamp').reset_index(drop=True)
     return df
 
 def engineer_features(df):

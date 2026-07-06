@@ -4,20 +4,30 @@
 
 ### Stack
 - **Python 3.9+**: Backend, scraping, ML
-- **SQLite**: Base de datos local (escalable a PostgreSQL)
+- **CSV (data/history.csv)**: histórico append-only en texto (ver decisión abajo)
 - **scikit-learn**: Modelo predictivo (Random Forest)
-- **APScheduler**: Tareas periódicas
+- **GitHub Actions**: ejecuta el scraper cada 5 min (gym abierto 7:00-23:00)
 - **BeautifulSoup**: Web scraping
+- **Home Assistant**: lee `data/latest.json` vía REST → Google Home
 
 ### Arquitectura
 
 ```
-Scraper (5 min)  →  SQLite  →  ML Model (1h)  →  Predicción
+DreamFit → GitHub Actions (5 min) → scraper.py ─┬─ append history.csv → ML Model → Predicción
+                                                └─ latest.json → Home Assistant → Google Home
 ```
 
-1. **scraper.py**: Extrae aforo actual de DreamFit
-2. **ml_model.py**: Features temporales + Random Forest
-3. **scheduler.py**: Orquesta ambas tareas
+1. **scraper.py**: Extrae aforo de DreamFit (multi-gym vía `config.py`), escribe CSV + JSON
+2. **ml_model.py**: Lee `history.csv`, features temporales + Random Forest
+3. **scheduler.py**: Orquestación local opcional (en producción se usa GitHub Actions)
+
+### Decisión: CSV en vez de SQLite (2026-07-06)
+
+El histórico se guardaba en `gym_data.db` (SQLite binario) commiteado por GitHub Actions cada 5 min.
+git **no puede fusionar binarios**, así que `git pull --rebase` daba conflicto y el push del workflow
+fallaba constantemente ("Cannot merge binary files"). Se cambió a **CSV de texto** (`data/history.csv`),
+que git fusiona sin problema. El `.db` dejó de trackearse (`git rm --cached`, sigue en `.gitignore`).
+El workflow además serializa runs con `concurrency` y reintenta el push con `pull --rebase --autostash`.
 
 ### Features del modelo
 
@@ -35,9 +45,7 @@ Scraper (5 min)  →  SQLite  →  ML Model (1h)  →  Predicción
 
 ## TODO
 
-- [ ] Validar selectores HTML reales
-- [ ] Agregar logging robusto
 - [ ] Dashboard web (Flask o FastAPI)
 - [ ] Tests unitarios
-- [ ] Exportar predicciones a CSV
 - [ ] Considerar LSTM para series temporales avanzadas
+- [ ] Reactivar entrenamiento automático cuando haya ~2 semanas de datos
