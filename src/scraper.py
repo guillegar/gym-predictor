@@ -4,6 +4,7 @@ import sqlite3
 from datetime import datetime
 import logging
 import sys
+from config import GYMS
 
 logging.basicConfig(
     level=logging.INFO,
@@ -13,8 +14,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 DB_PATH = "data/gym_data.db"
-DREAMFIT_URL = "https://www.dreamfit.es/centros/moratalaz"
-GYM_NAME = "DreamFit Moratalaz"
 
 def init_db():
     """Inicializa la base de datos si no existe."""
@@ -33,13 +32,13 @@ def init_db():
     conn.commit()
     conn.close()
 
-def scrape_gym_occupancy():
-    """Extrae el aforo actual del sitio de DreamFit."""
+def scrape_gym_occupancy(gym_url):
+    """Extrae el aforo actual de una URL de DreamFit."""
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
-        response = requests.get(DREAMFIT_URL, headers=headers, timeout=10)
+        response = requests.get(gym_url, headers=headers, timeout=10)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.content, 'html.parser')
@@ -47,16 +46,14 @@ def scrape_gym_occupancy():
         # Encontrar la sección de aforo
         aforo_section = soup.find('section', {'id': 'collapseAforo'})
         if not aforo_section:
-            logger.warning("No se encontró sección collapseAforo")
+            logger.warning(f"No se encontró sección collapseAforo en {gym_url}")
             return None
 
         # Extraer todos los h3.cliente dentro de la sección
         h3_elements = aforo_section.find_all('h3', class_='cliente')
 
         if len(h3_elements) < 2:
-            logger.warning(f"Se encontraron solo {len(h3_elements)} h3 elementos")
-            for i, elem in enumerate(h3_elements):
-                logger.debug(f"h3[{i}]: {elem.get_text(strip=True)}")
+            logger.warning(f"Se encontraron solo {len(h3_elements)} h3 elementos en {gym_url}")
             return None
 
         # Intenta extraer ocupación y capacidad
@@ -65,7 +62,6 @@ def scrape_gym_occupancy():
 
         for elem in h3_elements:
             text = elem.get_text(strip=True)
-            logger.debug(f"Analizando: {text}")
 
             # Buscar span con "Personas" (ocupación actual)
             if 'Personas' in text:
@@ -77,16 +73,15 @@ def scrape_gym_occupancy():
 
         # Si no encontramos capacidad, usamos un valor por defecto
         if occupancy is None:
-            logger.error("No se pudo extraer ocupación")
+            logger.error(f"No se pudo extraer ocupación de {gym_url}")
             return None
 
         if capacity is None:
-            capacity = 728  # Default para Moratalaz
-            logger.info("Usando capacidad por defecto: 728")
+            logger.warning(f"Capacidad no encontrada, usando default")
+            capacity = 728
 
         percentage = (occupancy / capacity * 100) if capacity > 0 else 0
 
-        logger.info(f"Aforo: {occupancy}/{capacity} ({percentage:.1f}%)")
         return {
             'occupancy': occupancy,
             'capacity': capacity,
@@ -94,10 +89,10 @@ def scrape_gym_occupancy():
         }
 
     except Exception as e:
-        logger.error(f"Error scraping: {e}")
+        logger.error(f"Error scraping {gym_url}: {e}")
         return None
 
-def save_occupancy(occupancy_data, gym_name=GYM_NAME):
+def save_occupancy(occupancy_data, gym_name):
     """Guarda los datos de aforo en la BD."""
     if not occupancy_data:
         return
@@ -110,10 +105,24 @@ def save_occupancy(occupancy_data, gym_name=GYM_NAME):
     """, (gym_name, occupancy_data['occupancy'], occupancy_data['capacity'], occupancy_data['percentage']))
     conn.commit()
     conn.close()
-    logger.info(f"Datos guardados en BD para {gym_name}")
+
+def scrape_all_gyms():
+    """Scrapeacomunale todos los gyms configurados."""
+    init_db()
+
+    logger.info(f"Iniciando scraping de {len(GYMS)} gym(s)")
+
+    for gym in GYMS:
+        gym_name = gym['name']
+        gym_url = gym['url']
+        logger.info(f"Scrapeando {gym_name}...")
+
+        data = scrape_gym_occupancy(gym_url)
+        if data:
+            save_occupancy(data, gym_name)
+            logger.info(f"OK - {gym_name}: {data['occupancy']}/{data['capacity']} ({data['percentage']:.1f}%)")
+        else:
+            logger.warning(f"ERROR - {gym_name}: No se pudo obtener datos")
 
 if __name__ == "__main__":
-    init_db()
-    data = scrape_gym_occupancy()
-    if data:
-        save_occupancy(data)
+    scrape_all_gyms()
