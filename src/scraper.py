@@ -97,7 +97,7 @@ def save_history_csv(gym_name, occupancy_data):
         if not file_exists:
             writer.writerow(CSV_HEADER)
         writer.writerow([
-            datetime.now().isoformat(),
+            datetime.now(MADRID_TZ).isoformat(),
             gym_name,
             occupancy_data['occupancy'],
             occupancy_data['capacity'],
@@ -112,7 +112,7 @@ def save_latest_json(gym_name, occupancy_data):
         "occupancy": occupancy_data['occupancy'],
         "capacity": occupancy_data['capacity'],
         "percentage": round(occupancy_data['percentage'], 1),
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now(MADRID_TZ).isoformat()
     }
 
     json_path = "data/latest.json"

@@ -5,6 +5,7 @@ from sklearn.preprocessing import StandardScaler
 import pickle
 import logging
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -12,11 +13,20 @@ logger = logging.getLogger(__name__)
 HISTORY_CSV = "data/history.csv"
 MODEL_PATH = "data/model.pkl"
 SCALER_PATH = "data/scaler.pkl"
+MADRID_TZ = ZoneInfo("Europe/Madrid")
 
 def load_data():
-    """Carga el historico desde el CSV."""
+    """Carga el historico desde el CSV.
+
+    Filas antiguas no llevan offset de zona (son hora de Madrid escrita como naive);
+    filas nuevas llevan +02:00/+01:00 explicito. Se normalizan todas a Madrid-aware
+    antes de ordenar, porque pandas no puede comparar naive con aware.
+    """
     df = pd.read_csv(HISTORY_CSV)
-    df['timestamp'] = pd.to_datetime(df['timestamp'], format='ISO8601')
+    ts = df['timestamp'].apply(pd.Timestamp)
+    df['timestamp'] = ts.apply(
+        lambda t: t.tz_localize(MADRID_TZ) if t.tzinfo is None else t.tz_convert(MADRID_TZ)
+    )
     df = df.sort_values('timestamp').reset_index(drop=True)
     return df
 
