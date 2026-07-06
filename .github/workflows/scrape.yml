@@ -26,15 +26,9 @@ jobs:
         run: |
           python src/scraper.py
 
-      - name: Commit BD changes
+      - name: Commit and push latest.json
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add data/gym_data.db
-          git diff --quiet && git diff --staged --quiet || git commit -m "Update gym data - $(date -u +'%Y-%m-%d %H:%M:%S') UTC"
-
-      - name: Push changes
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.ref }}
+          git add data/latest.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update gym data - $(date -u +'%Y-%m-%d %H:%M:%S') UTC" && git push)
