@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 DB_PATH = "data/gym_data.db"
 DREAMFIT_URL = "https://www.dreamfit.es/centros/moratalaz"
+GYM_NAME = "DreamFit Moratalaz"
 
 def init_db():
     """Inicializa la base de datos si no existe."""
@@ -23,9 +24,10 @@ def init_db():
         CREATE TABLE IF NOT EXISTS gym_occupancy (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            occupancy INTEGER,
-            capacity INTEGER,
-            percentage REAL
+            gym_name TEXT NOT NULL,
+            occupancy INTEGER NOT NULL,
+            capacity INTEGER NOT NULL,
+            percentage REAL NOT NULL
         )
     """)
     conn.commit()
@@ -95,7 +97,7 @@ def scrape_gym_occupancy():
         logger.error(f"Error scraping: {e}")
         return None
 
-def save_occupancy(occupancy_data):
+def save_occupancy(occupancy_data, gym_name=GYM_NAME):
     """Guarda los datos de aforo en la BD."""
     if not occupancy_data:
         return
@@ -103,12 +105,12 @@ def save_occupancy(occupancy_data):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
-        INSERT INTO gym_occupancy (occupancy, capacity, percentage)
-        VALUES (?, ?, ?)
-    """, (occupancy_data['occupancy'], occupancy_data['capacity'], occupancy_data['percentage']))
+        INSERT INTO gym_occupancy (gym_name, occupancy, capacity, percentage)
+        VALUES (?, ?, ?, ?)
+    """, (gym_name, occupancy_data['occupancy'], occupancy_data['capacity'], occupancy_data['percentage']))
     conn.commit()
     conn.close()
-    logger.info("Datos guardados en BD")
+    logger.info(f"Datos guardados en BD para {gym_name}")
 
 if __name__ == "__main__":
     init_db()
