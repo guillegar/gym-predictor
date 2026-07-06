@@ -1,0 +1,40 @@
+name: Train Model (cada hora)
+
+on:
+  schedule:
+    # Cada hora entre 8:00 y 23:00 UTC
+    - cron: '0 8-23 * * *'
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Train and predict
+        run: |
+          python src/ml_model.py
+
+      - name: Commit model changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add data/model.pkl data/scaler.pkl
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update model - $(date -u +'%Y-%m-%d %H:%M:%S') UTC"
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref }}

@@ -3,8 +3,13 @@ from bs4 import BeautifulSoup
 import sqlite3
 from datetime import datetime
 import logging
+import sys
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
 logger = logging.getLogger(__name__)
 
 DB_PATH = "data/gym_data.db"
