@@ -4,6 +4,7 @@ import sqlite3
 from datetime import datetime
 import logging
 import sys
+import json
 from config import GYMS
 
 logging.basicConfig(
@@ -93,7 +94,7 @@ def scrape_gym_occupancy(gym_url):
         return None
 
 def save_occupancy(occupancy_data, gym_name):
-    """Guarda los datos de aforo en la BD."""
+    """Guarda los datos de aforo en la BD y en JSON."""
     if not occupancy_data:
         return
 
@@ -105,6 +106,23 @@ def save_occupancy(occupancy_data, gym_name):
     """, (gym_name, occupancy_data['occupancy'], occupancy_data['capacity'], occupancy_data['percentage']))
     conn.commit()
     conn.close()
+
+    save_latest_json(gym_name, occupancy_data)
+
+def save_latest_json(gym_name, occupancy_data):
+    """Guarda el ultimo registro en un archivo JSON para Home Assistant."""
+    latest_data = {
+        "gym_name": gym_name,
+        "occupancy": occupancy_data['occupancy'],
+        "capacity": occupancy_data['capacity'],
+        "percentage": round(occupancy_data['percentage'], 1),
+        "timestamp": datetime.now().isoformat()
+    }
+
+    json_path = "data/latest.json"
+    with open(json_path, 'w') as f:
+        json.dump(latest_data, f, indent=2)
+    logger.info(f"JSON actualizado: {json_path}")
 
 def scrape_all_gyms():
     """Scrapeacomunale todos los gyms configurados."""
