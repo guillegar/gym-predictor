@@ -6,8 +6,6 @@ __pycache__/
 venv/
 env/
 .venv
-*.db
-*.sqlite3
 .DS_Store
 .env
 *.log
@@ -17,3 +15,6 @@ notebooks/.ipynb_checkpoints/
 dist/
 build/
 *.egg-info/
+
+# Excepto gym_data.db que queremos trackear
+!data/gym_data.db
