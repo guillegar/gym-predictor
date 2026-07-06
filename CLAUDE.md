@@ -31,8 +31,16 @@ cerraron el 13/06/2023, y `google_assistant_sdk` solo manda comandos a Google (n
 altavoz consulte una URL/JSON externo por voz). La integración `google_assistant` manual solo deja
 "preguntar" sensores de `device_class` concretos (temperature, humidity, etc.), no un contador de
 personas — el aforo se expone en HA disfrazado de esos tipos si se quiere usar por voz en Google Home.
-Para consulta en lenguaje natural sin ese truco, la vía elegida es un **Gem de Gemini** con la URL de
-`estado.txt` (repo público) en sus instrucciones; Gemini navega y lee el resumen en texto plano.
+
+Para consulta en lenguaje natural se optó por un **Gem de Gemini**. Primer intento: URL de
+`estado.txt` (raw de GitHub) en las instrucciones del Gem — **falló**, la herramienta de navegación
+del Gem no puede leer archivos de texto en bruto de forma fiable. Solución que sí funciona:
+**`src/sheets_sync.py`** escribe el estado en una **Google Sheet**, adjuntada al Gem como fuente de
+Drive. Los Gems mantienen conexión en vivo con Docs/Sheets/Slides de Drive ("living document"),
+a diferencia de una URL externa que requiere navegación. Requiere cuenta de servicio de Google Cloud
+(ver `docs/GOOGLE_SHEETS_SETUP.md`); credenciales via secret `GOOGLE_SHEETS_CREDENTIALS_JSON` +
+`GOOGLE_SHEET_ID` en GitHub Actions. `sheets_sync.update_sheet()` no hace nada si esas variables no
+están configuradas (no rompe ejecuciones locales sin credenciales).
 
 ### Decisión: CSV en vez de SQLite (2026-07-06)
 

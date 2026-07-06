@@ -8,6 +8,7 @@ import json
 import csv
 import os
 from config import GYMS
+import sheets_sync
 
 MADRID_TZ = ZoneInfo("Europe/Madrid")
 
@@ -160,6 +161,9 @@ def scrape_all_gyms():
 
     if results:
         save_status_txt(results)
+
+        now_str = datetime.now(MADRID_TZ).strftime('%Y-%m-%d %H:%M')
+        sheets_sync.update_sheet([(name, data, now_str) for name, data in results])
 
 if __name__ == "__main__":
     scrape_all_gyms()

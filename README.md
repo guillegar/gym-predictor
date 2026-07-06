@@ -52,20 +52,23 @@ python src/ml_model.py
 ```
 gym-predictor/
 ├── src/
-│   ├── scraper.py       # Recoge aforo del sitio y escribe CSV + JSON
+│   ├── scraper.py       # Recoge aforo del sitio y escribe CSV + JSON + Sheet
 │   ├── config.py        # Lista de gyms a monitorear
+│   ├── sheets_sync.py   # Sincroniza el estado actual con Google Sheets
 │   ├── ml_model.py      # Entrena y predice (lee el CSV)
 │   └── scheduler.py     # Ejecución periódica local (opcional)
 ├── data/
 │   ├── history.csv      # Histórico completo (fuente de datos para ML)
 │   ├── latest.json      # Último registro (lo lee Home Assistant)
-│   ├── estado.txt       # Resumen legible (pensado para que lo lea un LLM/Gemini)
+│   ├── estado.txt       # Resumen legible en texto plano
+│   ├── service_account.json  # Credenciales Google (local, gitignored)
 │   ├── model.pkl        # Modelo entrenado
 │   └── scaler.pkl       # Scaler del modelo
 ├── .github/workflows/
 │   └── scrape.yml       # GitHub Actions: scraping cada 5 min
 ├── docs/
-│   └── HOME_ASSISTANT_SETUP.md
+│   ├── HOME_ASSISTANT_SETUP.md
+│   └── GOOGLE_SHEETS_SETUP.md
 ├── notebooks/           # Análisis y exploración
 └── requirements.txt
 ```
@@ -83,17 +86,20 @@ gym-predictor/
 DreamFit web → GitHub Actions (cada 5 min) → scraper.py
                                                  ├── append a history.csv
                                                  ├── sobrescribe latest.json → Home Assistant → Google Home (device_class)
-                                                 └── sobrescribe estado.txt  → Gemini (Gem con la URL raw)
+                                                 ├── sobrescribe estado.txt  (intento fallido de leerlo desde Gemini)
+                                                 └── sobrescribe Google Sheet → Gemini (Gem, living document)
 ```
 
 ## Consultar el aforo con Gemini
 
 Google Assistant no puede leer una URL/JSON externo por voz (las Conversational Actions personalizadas
-se cerraron en 2023). En su lugar, `data/estado.txt` publica un resumen en texto plano y legible pensado
-para que un LLM lo lea: crea un **Gem** en Gemini con esta URL en sus instrucciones y podrás preguntarle
-por el aforo en lenguaje natural.
+se cerraron en 2023). Se probó `data/estado.txt` (texto plano en la URL raw de GitHub) como fuente para
+un Gem, pero la herramienta de navegación de Gemini no pudo leer ese archivo en bruto de forma fiable.
 
-URL pública: `https://raw.githubusercontent.com/guillegar/gym-predictor/master/data/estado.txt`
+**Solución que funciona**: `src/sheets_sync.py` sincroniza el estado actual en una **Google Sheet**.
+Los Gems mantienen una conexión en vivo con archivos de Drive (Docs/Sheets/Slides) — cada actualización
+se refleja automáticamente sin reprocesar el Gem. Ver [`docs/GOOGLE_SHEETS_SETUP.md`](docs/GOOGLE_SHEETS_SETUP.md)
+para el setup completo (proyecto de Google Cloud, cuenta de servicio, secrets de GitHub Actions).
 
 ## Próximos pasos
 

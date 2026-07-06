@@ -17,3 +17,6 @@ notebooks/.ipynb_checkpoints/
 dist/
 build/
 *.egg-info/
+
+# Credenciales de Google Sheets (NUNCA subir a git)
+data/service_account.json
