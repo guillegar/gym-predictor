@@ -32,15 +32,20 @@ altavoz consulte una URL/JSON externo por voz). La integración `google_assistan
 "preguntar" sensores de `device_class` concretos (temperature, humidity, etc.), no un contador de
 personas — el aforo se expone en HA disfrazado de esos tipos si se quiere usar por voz en Google Home.
 
-Para consulta en lenguaje natural se optó por un **Gem de Gemini**. Primer intento: URL de
+Para consulta en lenguaje natural se probó un **Gem de Gemini**. Primer intento: URL de
 `estado.txt` (raw de GitHub) en las instrucciones del Gem — **falló**, la herramienta de navegación
-del Gem no puede leer archivos de texto en bruto de forma fiable. Solución que sí funciona:
-**`src/sheets_sync.py`** escribe el estado en una **Google Sheet**, adjuntada al Gem como fuente de
-Drive. Los Gems mantienen conexión en vivo con Docs/Sheets/Slides de Drive ("living document"),
-a diferencia de una URL externa que requiere navegación. Requiere cuenta de servicio de Google Cloud
-(ver `docs/GOOGLE_SHEETS_SETUP.md`); credenciales via secret `GOOGLE_SHEETS_CREDENTIALS_JSON` +
-`GOOGLE_SHEET_ID` en GitHub Actions. `sheets_sync.update_sheet()` no hace nada si esas variables no
-están configuradas (no rompe ejecuciones locales sin credenciales).
+del Gem no puede leer archivos de texto en bruto de forma fiable. Segunda vía preparada (código listo,
+**pendiente de credenciales de Google Cloud, aparcada de momento**): `src/sheets_sync.py` escribe el
+estado en una Google Sheet, que los Gems sí leen en vivo ("living document"); ver
+`docs/GOOGLE_SHEETS_SETUP.md`.
+
+**Vía activa ahora (2026-07-06)**: truco de `device_class` en Home Assistant para consulta directa
+por "OK Google", sin pasar por Gemini. `sensor.gym_aforo_porcentaje` ya usa `device_class: humidity`
+(match natural, ambos 0-100%). Se añade un sensor plantilla `sensor.gym_aforo_temperatura` que
+reexpone `sensor.gym_aforo` (personas) como `device_class: temperature` / unit `°C` — Google solo
+permite preguntar por voz sensores de estos tipos concretos. Frases resultantes ("qué humedad hay
+en el gimnasio", "qué temperatura tiene el aforo") son forzadas por la limitación de Google, no
+elegibles libremente. Detalle completo y YAML en `docs/HOME_ASSISTANT_SETUP.md`.
 
 ### Decisión: CSV en vez de SQLite (2026-07-06)
 

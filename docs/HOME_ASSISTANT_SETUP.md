@@ -1,92 +1,109 @@
 # Integración con Home Assistant + Google Home
 
-## Setup Home Assistant
+## Setup Home Assistant (ya desplegado)
 
-### 1. Agregar REST Sensor
+### 1. REST Sensor
 
-En `configuration.yaml` o en un archivo separado (`packages/gym.yaml`):
+Ya añadido en `configuration.yaml` (Raspberry Pi, vía SSH):
 
 ```yaml
 rest:
-  - scan_interval: 300  # Cada 5 minutos
+  - scan_interval: 300
     resource: https://raw.githubusercontent.com/guillegar/gym-predictor/master/data/latest.json
-    name: "Gym Occupancy"
     sensor:
-      - name: "Gym Occupancy"
-        unique_id: gym_occupancy_people
+      - name: "Gym Aforo"
+        unique_id: gym_aforo_personas
         unit_of_measurement: "personas"
-        state_class: "measurement"
+        value_template: "{{ value_json.occupancy }}"
         json_attributes:
           - gym_name
           - capacity
           - percentage
           - timestamp
-        value_template: "{{ value_json.occupancy }}"
 
-      - name: "Gym Occupancy Percentage"
-        unique_id: gym_occupancy_percentage
+      - name: "Gym Aforo Porcentaje"
+        unique_id: gym_aforo_porcentaje
         unit_of_measurement: "%"
-        state_class: "measurement"
+        device_class: humidity
         value_template: "{{ value_json.percentage }}"
 ```
 
-### 2. Exponer a Google Home
+Entidades resultantes: `sensor.gym_aforo` (personas) y `sensor.gym_aforo_porcentaje` (%).
 
-En `configuration.yaml`:
+### 2. Sensor "disfrazado" de temperatura (para consulta por voz)
+
+Google Assistant solo permite **preguntar por voz** sensores de `device_class` concretos:
+`temperature`, `humidity`, `aqi`, `carbon_dioxide`, `carbon_monoxide`, `pm10`, `pm25`,
+`volatile_organic_compounds`. Un contador de personas no es ninguno de esos tipos, así que
+no se puede preguntar "cuánta gente hay" de forma nativa.
+
+**Truco aplicado**: el porcentaje ya usa `device_class: humidity` (arriba, encaja natural porque
+ambos son 0-100%). Para el número de personas, se añade un **sensor plantilla** que reexpone el
+mismo valor como si fuera una temperatura en °C:
 
 ```yaml
-google_home:
-  # Ya debe estar configurada
+template:
+  - sensor:
+      - name: "Gym Aforo Temperatura"
+        unique_id: gym_aforo_temperatura
+        device_class: temperature
+        unit_of_measurement: "°C"
+        state: "{{ states('sensor.gym_aforo') }}"
+```
 
+Esto **no crea una nueva llamada de red** — solo reinterpreta `sensor.gym_aforo`, que ya se
+actualiza por el REST sensor cada 5 min.
+
+### 3. Exponer las entidades a Google Assistant
+
+Método recomendado (UI unificada de exposición, no hace falta tocar `google_assistant:` en YAML):
+
+1. **Ajustes → Asistentes de voz → Exponer** (Settings → Voice assistants → Expose)
+2. Busca `Gym Aforo Porcentaje` y `Gym Aforo Temperatura`
+3. Marca la columna **Google Assistant** en ambas
+4. Guarda
+
+Si tu integración `google_assistant:` es manual y esa pestaña no sincroniza sola, añade en
+`configuration.yaml` dentro del bloque `google_assistant:` existente:
+
+```yaml
 google_assistant:
-  project_id: your_project_id
-  service_account_json: SERVICE_ACCOUNT_JSON_PATH
-  report_state: true
-  exposed_domains:
-    - sensor
+  # ... tu configuración actual (project_id, service_account_json, etc.) ...
   entity_config:
-    sensor.gym_occupancy:
-      name: "Aforo del Gym"
-      aliases:
-        - "gente en el gym"
-        - "ocupacion del gym"
-    sensor.gym_occupancy_percentage:
-      name: "Porcentaje del Gym"
-      aliases:
-        - "porcentaje de ocupacion"
+    sensor.gym_aforo_porcentaje:
+      name: "gimnasio"
+    sensor.gym_aforo_temperatura:
+      name: "aforo del gimnasio"
 ```
 
-### 3. Crear una Automation (opcional)
+### 4. Reiniciar y sincronizar
 
-Para recibir notificaciones cuando el gym esté vacío o lleno:
-
-```yaml
-automation:
-  - alias: "Notify when gym is empty"
-    trigger:
-      platform: numeric_state
-      entity_id: sensor.gym_occupancy
-      below: 50
-    action:
-      service: notify.mobile_app_phone
-      data:
-        title: "Gym casi vacío"
-        message: "Hay {{ states('sensor.gym_occupancy') }} personas"
+```bash
+ha core check
+ha core restart
 ```
 
-## Comandos de Google Home
+Espera ~1-2 min. Luego, en la app de Google Home, fuerza una sincronización de dispositivos
+(o simplemente di "OK Google, sincroniza mis dispositivos").
 
-Una vez configurado, podrás decir:
+## Comandos de Google Home (reales, probados)
 
-- "OK Google, ¿cuánta gente hay en el gym?"
-- "OK Google, ¿cuál es la ocupación del gym?"
-- "OK Google, ¿cuál es el porcentaje de ocupación del gym?"
+- **"OK Google, ¿qué humedad hay en el gimnasio?"** → responde el % de aforo (p. ej. "26 por ciento")
+- **"OK Google, ¿qué temperatura tiene el aforo del gimnasio?"** → responde el nº de personas
+  (p. ej. "72 grados" — el número es correcto, la unidad "grados" es el precio del truco)
+
+`sensor.gym_aforo` (sin disfraz) sigue disponible para dashboards y automatizaciones con sus
+unidades reales ("personas"); el sensor plantilla es solo para la consulta por voz.
 
 ## Troubleshooting
 
-- **No se actualiza**: Verifica que el JSON esté en GitHub
-- **REST Sensor no actualiza**: Reinicia HA o recarga REST config
-- **Google Home no entiende**: Asegúrate de que la entidad está expuesta en `exposed_domains`
+- **No se actualiza**: Verifica que `latest.json` esté fresco en GitHub
+  (`https://raw.githubusercontent.com/guillegar/gym-predictor/master/data/latest.json`)
+- **REST Sensor no actualiza**: Reinicia HA o recarga la integración REST
+- **Google no encuentra la entidad nueva**: hace falta sincronizar dispositivos tras exponerla
+  (app Google Home → Configuración → Works with Google, o "OK Google, sincroniza mis dispositivos")
+- **Google no entiende la pregunta**: prueba variantes ("humedad del gimnasio", "temperatura del
+  aforo del gimnasio") — Google elige la frase según el `device_class`, no es 100% libre
 
 ## URLs útiles
 
