@@ -1,12 +1,15 @@
 import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import logging
 import sys
 import json
 import csv
 import os
 from config import GYMS
+
+MADRID_TZ = ZoneInfo("Europe/Madrid")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -117,10 +120,31 @@ def save_latest_json(gym_name, occupancy_data):
         json.dump(latest_data, f, indent=2)
     logger.info(f"JSON actualizado: {json_path}")
 
+STATUS_TXT = "data/estado.txt"
+
+def save_status_txt(results):
+    """Escribe un resumen en texto plano y legible (pensado para que un LLM lo lea)."""
+    now = datetime.now(MADRID_TZ)
+    lines = [
+        "Estado de ocupacion de gimnasios DreamFit.",
+        f"Ultima actualizacion: {now.strftime('%Y-%m-%d %H:%M')} (hora local de Madrid).",
+        "",
+    ]
+    for gym_name, occupancy_data in results:
+        lines.append(
+            f"{gym_name}: {occupancy_data['occupancy']} personas de {occupancy_data['capacity']} "
+            f"({occupancy_data['percentage']:.1f}% de aforo)."
+        )
+
+    with open(STATUS_TXT, 'w', encoding='utf-8') as f:
+        f.write("\n".join(lines) + "\n")
+    logger.info(f"Estado en texto actualizado: {STATUS_TXT}")
+
 def scrape_all_gyms():
     """Scrapea todos los gyms configurados."""
     logger.info(f"Iniciando scraping de {len(GYMS)} gym(s)")
 
+    results = []
     for gym in GYMS:
         gym_name = gym['name']
         gym_url = gym['url']
@@ -129,9 +153,13 @@ def scrape_all_gyms():
         data = scrape_gym_occupancy(gym_url)
         if data:
             save_occupancy(data, gym_name)
+            results.append((gym_name, data))
             logger.info(f"OK - {gym_name}: {data['occupancy']}/{data['capacity']} ({data['percentage']:.1f}%)")
         else:
             logger.warning(f"ERROR - {gym_name}: No se pudo obtener datos")
+
+    if results:
+        save_status_txt(results)
 
 if __name__ == "__main__":
     scrape_all_gyms()

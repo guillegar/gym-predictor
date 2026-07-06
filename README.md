@@ -59,6 +59,7 @@ gym-predictor/
 ├── data/
 │   ├── history.csv      # Histórico completo (fuente de datos para ML)
 │   ├── latest.json      # Último registro (lo lee Home Assistant)
+│   ├── estado.txt       # Resumen legible (pensado para que lo lea un LLM/Gemini)
 │   ├── model.pkl        # Modelo entrenado
 │   └── scaler.pkl       # Scaler del modelo
 ├── .github/workflows/
@@ -81,8 +82,18 @@ gym-predictor/
 ```
 DreamFit web → GitHub Actions (cada 5 min) → scraper.py
                                                  ├── append a history.csv
-                                                 └── sobrescribe latest.json → Home Assistant → Google Home
+                                                 ├── sobrescribe latest.json → Home Assistant → Google Home (device_class)
+                                                 └── sobrescribe estado.txt  → Gemini (Gem con la URL raw)
 ```
+
+## Consultar el aforo con Gemini
+
+Google Assistant no puede leer una URL/JSON externo por voz (las Conversational Actions personalizadas
+se cerraron en 2023). En su lugar, `data/estado.txt` publica un resumen en texto plano y legible pensado
+para que un LLM lo lea: crea un **Gem** en Gemini con esta URL en sus instrucciones y podrás preguntarle
+por el aforo en lenguaje natural.
+
+URL pública: `https://raw.githubusercontent.com/guillegar/gym-predictor/master/data/estado.txt`
 
 ## Próximos pasos
 

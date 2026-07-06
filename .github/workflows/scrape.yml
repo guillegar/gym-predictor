@@ -35,7 +35,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add data/history.csv data/latest.json
+          git add data/history.csv data/latest.json data/estado.txt
           if git diff --staged --quiet; then
             echo "Sin cambios que commitear"
             exit 0
