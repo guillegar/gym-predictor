@@ -1,4 +1,4 @@
 Estado de ocupacion de gimnasios DreamFit.
-Ultima actualizacion: 2026-07-07 19:34 (hora local de Madrid).
+Ultima actualizacion: 2026-07-07 21:22 (hora local de Madrid).
 
-DreamFit Moratalaz: 318 personas de 728 (43.7% de aforo).
+DreamFit Moratalaz: 258 personas de 728 (35.4% de aforo).
