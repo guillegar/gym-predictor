@@ -68,7 +68,8 @@ gym-predictor/
 │   └── scrape.yml       # GitHub Actions: scraping cada 5 min
 ├── docs/
 │   ├── HOME_ASSISTANT_SETUP.md
-│   └── GOOGLE_SHEETS_SETUP.md
+│   ├── GOOGLE_SHEETS_SETUP.md
+│   └── EXTERNAL_CRON_SETUP.md
 ├── notebooks/           # Análisis y exploración
 └── requirements.txt
 ```
@@ -83,12 +84,22 @@ gym-predictor/
 ## Flujo automático
 
 ```
-DreamFit web → GitHub Actions (cada 5 min) → scraper.py
-                                                 ├── append a history.csv
-                                                 ├── sobrescribe latest.json → Home Assistant → Google Home (device_class)
-                                                 ├── sobrescribe estado.txt  (intento fallido de leerlo desde Gemini)
-                                                 └── sobrescribe Google Sheet → Gemini (Gem, living document)
+cron-job.org (cada 5 min) → GitHub API (workflow_dispatch) → GitHub Actions → scraper.py
+                                                                                  ├── append a history.csv
+                                                                                  ├── sobrescribe latest.json → Home Assistant → Google Home (device_class)
+                                                                                  ├── sobrescribe estado.txt  (intento fallido de leerlo desde Gemini)
+                                                                                  └── sobrescribe Google Sheet → Gemini (Gem, living document)
 ```
+
+### Por qué un cron externo y no el `schedule:` de GitHub Actions
+
+El `schedule` cron nativo de GitHub Actions **no es fiable a intervalos de 5 minutos**: es "best
+effort" y la plataforma retrasa/descarta ejecuciones bajo carga (confirmado en este proyecto:
+huecos de 1-3 horas en vez de 5 min). Un cron externo gratuito ([cron-job.org](https://cron-job.org))
+llama cada 5 min a la API de GitHub para disparar el workflow (`workflow_dispatch`) — GitHub solo
+*ejecuta* el job on-demand, no *programa* el timing, así que no sufre el descarte del scheduler
+interno. Ver [`docs/EXTERNAL_CRON_SETUP.md`](docs/EXTERNAL_CRON_SETUP.md) para el setup completo.
+El `schedule:` que queda en `scrape.yml` (cada 30 min) es solo un respaldo por si el cron externo falla.
 
 ## Consultar el aforo con Gemini
 

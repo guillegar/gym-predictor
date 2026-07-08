@@ -6,7 +6,8 @@
 - **Python 3.9+**: Backend, scraping, ML
 - **CSV (data/history.csv)**: histórico append-only en texto (ver decisión abajo)
 - **scikit-learn**: Modelo predictivo (Random Forest)
-- **GitHub Actions**: ejecuta el scraper cada 5 min (gym abierto 7:00-23:00)
+- **GitHub Actions**: ejecuta el scraper (gym abierto 7:00-23:00); disparo real cada 5 min vía
+  cron externo, ver decisión de scheduling abajo
 - **BeautifulSoup**: Web scraping
 - **Home Assistant**: lee `data/latest.json` vía REST → Google Home
 - **Gemini**: lee `data/estado.txt` (texto plano) vía un Gem con la URL raw en sus instrucciones
@@ -14,9 +15,10 @@
 ### Arquitectura
 
 ```
-DreamFit → GitHub Actions (5 min) → scraper.py ─┬─ append history.csv → ML Model → Predicción
-                                                ├─ latest.json → Home Assistant → Google Home
-                                                └─ estado.txt  → Gemini (Gem)
+cron-job.org (5 min) → GitHub API workflow_dispatch → GitHub Actions → scraper.py
+                                                                          ├─ append history.csv → ML Model → Predicción
+                                                                          ├─ latest.json → Home Assistant → Google Home
+                                                                          └─ estado.txt  → Gemini (Gem)
 ```
 
 1. **scraper.py**: Extrae aforo de DreamFit (multi-gym vía `config.py`), escribe CSV + JSON + estado.txt
@@ -46,6 +48,21 @@ reexpone `sensor.gym_aforo` (personas) como `device_class: temperature` / unit `
 permite preguntar por voz sensores de estos tipos concretos. Frases resultantes ("qué humedad hay
 en el gimnasio", "qué temperatura tiene el aforo") son forzadas por la limitación de Google, no
 elegibles libremente. Detalle completo y YAML en `docs/HOME_ASSISTANT_SETUP.md`.
+
+### Decisión: cron externo en vez de `schedule` de GitHub Actions (2026-07-08)
+
+El cron `*/5 7-22 * * *` de GitHub Actions dejó de disparar cada 5 min: verificado con
+`gh run list` que los runs `event: schedule` llegaban con huecos de 1-3 horas en vez de 5 min.
+Es una limitación conocida y documentada de la plataforma (no arreglable desde el YAML): GitHub
+retrasa/descarta ejecuciones de `schedule` bajo carga alta, y cuanto más frecuente el cron, más
+se descarta — ampliamente reportado por la comunidad para intervalos de 5 min en repos gratuitos.
+
+Solución: un cron externo (cron-job.org) llama cada 5 min a la API de GitHub
+(`POST /repos/.../actions/workflows/scrape.yml/dispatches`) con un Personal Access Token de
+alcance mínimo (fine-grained, solo este repo, permiso Actions: read/write). GitHub solo *ejecuta*
+el job on-demand (`workflow_dispatch`), no *programa* el timing — así que no sufre el descarte del
+scheduler interno. El `schedule: cron: '0,30 7-22 * * *'` que queda en el workflow es solo un
+respaldo de baja frecuencia (menos disputado en su infra) por si el cron externo falla algún día.
 
 ### Decisión: CSV en vez de SQLite (2026-07-06)
 

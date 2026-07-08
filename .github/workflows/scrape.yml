@@ -1,9 +1,13 @@
 name: Gym Scraper (cada 5 min)
 
+# El disparo real cada 5 min lo hace un cron EXTERNO (cron-job.org) llamando
+# a la API de workflow_dispatch. El "schedule" de aqui es solo un respaldo de
+# baja frecuencia: GitHub retrasa/descarta con frecuencia los cron internos
+# de */5 min bajo carga alta (confirmado empiricamente: huecos de 1-3h en
+# vez de 5 min), pero los intervalos de 30 min son mucho mas fiables.
 on:
   schedule:
-    # Cada 5 minutos, solo entre 7:00 y 22:55 UTC
-    - cron: '*/5 7-22 * * *'
+    - cron: '0,30 7-22 * * *'
   workflow_dispatch:
 
 # Serializa los runs: nunca dos a la vez (evita carreras en el push)
